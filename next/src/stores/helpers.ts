@@ -1,22 +1,23 @@
 import type { StoreApi, UseBoundStore } from "zustand";
 
-/*
-  Automatically creates selectors for each states in store.
-  Zustand recommends using selectors for calling state/actions for optimal performance
-  Reference: https://docs.pmnd.rs/zustand/guides/auto-generating-selectors
-*/
-type WithSelectors<S> = S extends { getState: () => infer T }
-  ? S & { use: { [K in keyof T]: () => T[K] } }
-  : never;
+type StateKeys<S> = {
+  [K in keyof S]: K;
+}[keyof S];
+
+type WithSelectors<S> = S & {
+  use: {
+    [K in StateKeys<S>]: () => S[K];
+  };
+};
 
 export const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(
-  _store: S
-) => {
-  const store = _store as WithSelectors<typeof _store>;
-  store.use = {};
-  for (const k of Object.keys(store.getState())) {
-    (store.use)[k] = () => store((s) => s[k as keyof typeof s]);
-  }
+  store: S
+): WithSelectors<S> => {
+  const stateKeys = Object.keys(store.getState()) as StateKeys<S>[];
+  const selectors = stateKeys.reduce((acc, key) => {
+    acc.use[key] = () => store((state) => state[key as keyof typeof state]);
+    return acc;
+  }, { ...store, use: {} } as WithSelectors<S>);
 
-  return store;
+  return selectors;
 };
