@@ -1,7 +1,18 @@
-cd "$(dirname "$0")" || exit 1
-cd .. || exit 1
+#!/bin/bash
+
+# Change to the parent directory of the script
+cd "$(dirname "$0")"/.. || exit 1
+
+# Change to the platform directory
 cd platform || exit 1
 
-rm poetry.lock
+# Remove the poetry.lock file if it exists
+if [ -f poetry.lock ]; then
+  rm poetry.lock
+fi
+
+# Install the dependencies using Poetry
 poetry install
+
+# Lock the dependencies using Poetry
 poetry lock
