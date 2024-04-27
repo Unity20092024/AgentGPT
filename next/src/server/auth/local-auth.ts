@@ -13,14 +13,16 @@ const monthFromNow = () => {
   return new Date(now.setMonth(now.getMonth() + 1));
 };
 
-function cookieToString(cookie: string | undefined | null | boolean) {
-  switch (typeof cookie) {
-    case "boolean":
-      return cookie.toString();
-    case "string":
-      return cookie;
-    default:
-      return "";
+function cookieToString(cookie: string | undefined | null): string {
+  if (typeof cookie === "string") {
+    return cookie;
+  }
+  return "";
+}
+
+declare module "next-auth" {
+  interface Session {
+    sessionToken: string;
   }
 }
 
@@ -29,6 +31,12 @@ export const options = (
   req: NextApiRequest | IncomingMessage,
   res: NextApiResponse | ServerResponse
 ): AuthOptions => {
+  const isNextApiRequest = (arg: any): arg is NextApiRequest =>
+    arg && typeof arg.query === "object" && typeof arg.body === "object";
+
+  const isNextApiResponse = (arg: any): arg is NextApiResponse =>
+    arg && typeof arg.status === "function" && typeof arg.json === "function";
+
   return {
     adapter,
     providers: [
@@ -81,29 +89,32 @@ export const options = (
             expires: monthFromNow(),
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          setCookie("next-auth.session-token", session.sessionToken, {
-            expires: session.expires,
-            req: req,
-            res: res,
-          });
+          if (isNextApiResponse(res)) {
+            setCookie("next-auth.session-token", session.sessionToken, {
+              expires: session.expires,
+              req: req as NextApiRequest,
+              res: res as NextApiResponse,
+            });
+          }
         }
 
         return true;
       },
-    },
-    jwt: {
-      encode: () => {
-        const cookie = getCookie("next-auth.session-token", {
-          req: req,
-          res: res,
-        });
 
-        return cookieToString(cookie);
-      },
-      decode: () => {
-        return null;
+      jwt: {
+        encode: () => {
+          const cookie = getCookie("next-auth.session-token", {
+            req: req as NextApiRequest,
+            res: res as NextApiResponse,
+          });
+
+          return cookieToString(cookie);
+        },
+        decode: () => {
+          return null;
+        },
       },
     },
   };
 };
+
