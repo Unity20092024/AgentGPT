@@ -58,20 +58,22 @@ export default function NavBar() {
                     hoveredItemIndex={hoveredButtonIndex}
                     icons={navigation.map((nav) => nav.icon)}
                   />
-                  {navigation.map((item, i) => (
-                    <a
-                      key={item.name}
-                      href={item.href}
-                      className={clsx(
-                        "after-gradient relative flex flex-col items-center justify-center p-2 px-4 text-center font-inter text-sm tracking-normal text-white transition-colors duration-700 before:absolute before:-bottom-[20px] before:-z-20 before:h-6 before:w-12 before:bg-white/60 before:blur-lg before:transition-opacity before:duration-700 after:absolute after:-bottom-[2.25px] after:h-[1px] after:w-16 after:px-2 after:transition-opacity after:duration-700 hover:text-white",
-                        currentIndex !== i && "text-white/50 before:opacity-0 after:opacity-0"
-                      )}
-                      onMouseEnter={() => setHoveredButtonIndex(i)}
-                      onMouseLeave={() => setHoveredButtonIndex(0)}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
+                  <div className="flex">
+                    {navigation.map((item, i) => (
+                      <a
+                        key={item.name}
+                        href={item.href}
+                        className={clsx(
+                          "after-gradient relative flex flex-col items-center justify-center p-2 px-4 text-center font-inter text-sm tracking-normal text-white transition-colors duration-700 before:absolute before:-bottom-[20px] before:-z-20 before:h-6 before:w-12 before:bg-white/60 before:blur-lg before:transition-opacity before:duration-700 after:absolute after:-bottom-[2.25px] after:h-[1px] after:w-16 after:px-2 after:transition-opacity after:duration-700 hover:text-white",
+                          currentIndex !== i && "text-white/50 before:opacity-0 after:opacity-0"
+                        )}
+                        onMouseEnter={() => setHoveredButtonIndex(i)}
+                        onMouseLeave={() => setHoveredButtonIndex(0)}
+                      >
+                        {item.name}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="hidden justify-end gap-2 xmd:flex sm:items-center lg:flex-1">
@@ -124,3 +126,4 @@ export default function NavBar() {
     </FadeIn>
   );
 }
+
