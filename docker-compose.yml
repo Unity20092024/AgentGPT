@@ -11,8 +11,9 @@ services:
     volumes:
       - ./next/.env:/next/.env
       - ./next/:/next/
-      - /next/node_modules
-      - /next/.next
+    secrets:
+      - node_modules
+      - next_next
 
   platform:
     container_name: platform
@@ -28,17 +29,17 @@ services:
       - next/.env
     environment:
       REWORKD_PLATFORM_HOST: 0.0.0.0
-      REWORKD_PLATFORM_DB_HOST: agentgpt_db
+      REWORKD_PLATFORM_DB_HOST: db
       REWORKD_PLATFORM_DB_PORT: "3307"
       REWORKD_PLATFORM_DB_USER: "reworkd_platform"
       REWORKD_PLATFORM_DB_PASS: "reworkd_platform"
       REWORKD_PLATFORM_DB_BASE: "reworkd_platform"
     depends_on:
-      - agentgpt_db
+      - db
 
-  agentgpt_db:
+  db:
     image: mysql:8.0
-    container_name: agentgpt_db
+    container_name: db
     restart: always
     build:
       context: ./db
@@ -51,8 +52,20 @@ services:
       MYSQL_ROOT_PASSWORD: "reworkd_platform"
       MYSQL_TCP_PORT: 3307
     volumes:
-      - agentgpt_db:/var/lib/mysql
-    command: [ 'mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci' ]
+      - db_data:/var/lib/mysql
+    secrets:
+      - mysql_root_password
+      - mysql_password
+
+secrets:
+  node_modules:
+    file: ./next/node_modules.txt
+  next_next:
+    file: ./next/.next.txt
+  mysql_root_password:
+    file: ./db/mysql_root_password.txt
+  mysql_password:
+    file: ./db/mysql_password.txt
 
 volumes:
-  agentgpt_db:
+  db_data:
