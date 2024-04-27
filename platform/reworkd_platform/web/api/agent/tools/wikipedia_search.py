@@ -1,11 +1,11 @@
 from typing import Any
 
-from lanarky.responses import StreamingResponse
+import asyncio
+from fastapi import FastAPI, HTTPException
 from langchain import WikipediaAPIWrapper
 
 from reworkd_platform.web.api.agent.stream_mock import stream_string
 from reworkd_platform.web.api.agent.tools.tool import Tool
-
 
 class Wikipedia(Tool):
     description = (
@@ -17,14 +17,15 @@ class Wikipedia(Tool):
     arg_description = "A simple query string of just the noun in question."
     image_url = "/tools/wikipedia.png"
 
+    def __init__(self):
+        self.wikipedia_client = WikipediaAPIWrapper(wiki_client=None)
+
     async def call(
         self, goal: str, task: str, input_str: str, *args: Any, **kwargs: Any
     ) -> StreamingResponse:
-        wikipedia_client = WikipediaAPIWrapper(
-            wiki_client=None,  # Meta private value but mypy will complain its missing
-        )
+        try:
+            wikipedia_search = await self.wikipedia_client.run(input_str)
+            return stream_string(wikipedia_search)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Wikipedia search failed")
 
-        # TODO: Make the below async
-        wikipedia_search = wikipedia_client.run(input_str)
-        # return summarize_with_sources(self.model, self.language, goal, task, [wikipedia_search])
-        return stream_string("Wikipedia is currently not working")
