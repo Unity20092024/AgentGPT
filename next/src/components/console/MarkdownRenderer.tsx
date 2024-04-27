@@ -1,36 +1,67 @@
 import clsx from "clsx";
-import type { ReactNode } from "react";
 import React, { useCallback, useState } from "react";
-import { FiClipboard } from "react-icons/fi";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import "highlight.js/styles/default.css";
 
-interface MarkdownRendererProps {
-  children: string;
+interface CustomCodeBlockProps {
+  inline?: boolean;
   className?: string;
+  children: React.ReactNode;
 }
 
-const MarkdownRenderer = ({ children, className }: MarkdownRendererProps) => {
+const CustomCodeBlock: React.FC<CustomCodeBlockProps> = ({
+  inline,
+  className,
+  children,
+}) => {
+  const language = className ? className.replace("language-", "") : "plaintext";
+
+  return <code className={`hljs ${language}`}>{children}</code>;
+};
+
+const CustomLink: React.FC<{ href: string; children: React.ReactNode }> = ({
+  children,
+  href,
+}) => {
+  return (
+    <a
+      className={clsx(
+        "mx-0.5 rounded-full bg-sky-600 px-1.5 py-0.5 align-top text-[0.6rem] text-white",
+        "transition-colors duration-300 hover:bg-sky-500 hover:text-white"
+      )}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {children}
+    </a>
+  );
+};
+
+const MarkdownRenderer: React.FC<{ children: string }> = ({ children }) => {
   return (
     <ReactMarkdown
+      className="prose dark:prose-invert"
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[() => rehypeHighlight({ ignoreMissing: true })]}
+      rehypePlugins={[rehypeHighlight]}
       components={{
         pre: CustomPre,
         code: CustomCodeBlock,
-        h1: (props) => <h1 className="text-md mb-2 font-black sm:text-xl">{props.children}</h1>,
-        h2: (props) => <h1 className="sm:text-md mb-2 text-sm font-bold">{props.children}</h1>,
-        a: (props) => CustomLink({ children: props.children, href: props.href }),
+        h1: (props) => <h1 className="text-2xl font-bold sm:text-3xl">{props.children}</h1>,
+        h2: (props) => <h2 className="text-xl font-bold sm:text-2xl">{props.children}</h2>,
+        a: CustomLink,
         p: (props) => <p className="mb-4">{props.children}</p>,
         ul: (props) => (
-          <ul className={clsx("mb-4 list-disc marker:text-neutral-400", className)}>
+          <ul className={clsx("mb-4 list-disc marker:text-neutral-400")}>
             {props.children}
           </ul>
         ),
         ol: (props) => (
-          <ol className="mb-4 ml-8 list-decimal marker:text-neutral-400">{props.children}</ol>
+          <ol className="mb-4 ml-8 list-decimal marker:text-neutral-400">
+            {props.children}
+          </ol>
         ),
         li: (props) => <li className="mb-1 ml-8">{props.children}</li>,
       }}
@@ -40,20 +71,18 @@ const MarkdownRenderer = ({ children, className }: MarkdownRendererProps) => {
   );
 };
 
-const CustomPre = ({ children }: { children: ReactNode }) => {
+const CustomPre: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCopied, setIsCopied] = useState(false);
 
-  const code = React.Children.toArray(children).find(isValidCustomCodeBlock);
-
-  const language: string =
-    code && code.props.className
-      ? extractLanguageName(code.props.className.replace("hljs ", ""))
-      : "";
+  const code = React.Children.toArray(children).find(
+    (element: React.ReactElement) =>
+      element.type === CustomCodeBlock && !element.props.inline
+  );
 
   const handleCopyClick = useCallback(() => {
     if (code && React.isValidElement(code)) {
-      const codeString = extractTextFromNode(code.props.children);
-      void navigator.clipboard.writeText(codeString);
+      const codeString = (code.props.children as React.ReactElement).props.children as string;
+      navigator.clipboard.writeText(codeString);
       setIsCopied(true);
       setTimeout(() => {
         setIsCopied(false);
@@ -62,84 +91,32 @@ const CustomPre = ({ children }: { children: ReactNode }) => {
   }, [code]);
 
   return (
-    <div className="mb-4 flex flex-col ">
+    <div className="mb-4 flex flex-col">
       <div className="flex w-full items-center justify-between rounded-t-lg bg-slate-10 p-1 px-4 text-white">
-        <div>{language.charAt(0).toUpperCase() + language.slice(1)}</div>
+        <div>Code</div>
         <button
           onClick={handleCopyClick}
           className="flex items-center gap-2 rounded px-2 py-1 hover:bg-slate-9 focus:outline-none"
         >
-          <FiClipboard />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="feather feather-files"
+          >
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+            <polyline points="13 2 13 9 20 9"></polyline>
+          </svg>
           {isCopied ? "Copied!" : "Copy Code"}
         </button>
       </div>
-      <pre className="rounded-t-[0]">{children}</pre>
+      <pre className="rounded-t-[0.5rem]">{children}</pre>
     </div>
   );
-};
-
-interface CustomCodeBlockProps {
-  inline?: boolean;
-  className?: string;
-  children: ReactNode;
-}
-
-const CustomCodeBlock = ({ inline, className, children }: CustomCodeBlockProps) => {
-  // Inline code blocks will be placed directly within a paragraph
-  if (inline) {
-    return <code className="rounded bg-slate-2 px-1 py-[1px] text-black">{children}</code>;
-  }
-
-  const language = className ? className.replace("language-", "") : "plaintext";
-
-  return <code className={`hljs ${language}`}>{children}</code>;
-};
-
-const CustomLink = ({ children, href }) => {
-  return (
-    <a
-      className={clsx(
-        "mx-0.5 rounded-full bg-sky-600 px-1.5 py-0.5 align-top text-[0.6rem] text-white",
-        "transition-colors duration-300 hover:bg-sky-500 hover:text-white"
-      )}
-      href={href as string}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  );
-};
-
-const isValidCustomCodeBlock = (
-  element: ReactNode
-): element is React.ReactElement<CustomCodeBlockProps> =>
-  React.isValidElement(element) && element.type === CustomCodeBlock;
-
-const extractLanguageName = (languageString: string): string => {
-  // The provided language will be "language-{PROGRAMMING_LANGUAGE}"
-  const parts = languageString.split("-");
-  if (parts.length > 1) {
-    return parts[1] || "";
-  }
-  return "";
-};
-
-const extractTextFromNode = (node: React.ReactNode): string => {
-  if (typeof node === "string") {
-    return node;
-  }
-
-  if (Array.isArray(node)) {
-    return node.map(extractTextFromNode).join("");
-  }
-
-  if (React.isValidElement(node)) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument,@typescript-eslint/no-unsafe-member-access
-    return extractTextFromNode(node.props.children);
-  }
-
-  return "";
 };
 
 export default MarkdownRenderer;
