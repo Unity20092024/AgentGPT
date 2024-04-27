@@ -11,24 +11,36 @@ interface LinkInfo {
   index: number;
 }
 
+interface MetaData {
+  title?: string;
+  favicon?: string;
+  hostname?: string;
+}
+
 const MetaDataSchema = z.object({
-  title: z.string().nullish(),
-  favicon: z.string().nullish(),
-  hostname: z.string().nullish(),
+  title: z.string().optional(),
+  favicon: z.string().optional(),
+  hostname: z.string().optional(),
 });
 
 const SourceLink = ({ link, index }: LinkInfo) => {
-  const linkMeta = useQuery(["linkMeta", link], async () =>
-    MetaDataSchema.parse(
-      (
-        await axios.get(env.NEXT_PUBLIC_BACKEND_URL + "/api/metadata", {
+  const linkMeta = useQuery<MetaData, Error>(
+    ["linkMeta", link],
+    async () => {
+      const response = await axios.get<MetaData>(
+        env.NEXT_PUBLIC_BACKEND_URL + "/api/metadata",
+        {
           params: {
             url: link,
           },
-        })
-      ).data
-    )
-  );
+        }
+      );
+      return MetaDataSchema.parse(response.data);
+    }
+  ).catch((error) => {
+    console.error("Error fetching metadata:", error);
+    return {} as MetaData;
+  });
 
   const addImageFallback = (event: SyntheticEvent<HTMLImageElement, Event>) => {
     event.currentTarget.src = "/errorFavicon.ico";
@@ -36,7 +48,12 @@ const SourceLink = ({ link, index }: LinkInfo) => {
 
   return (
     <FadeIn>
-      <a href={link} target="_blank">
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        key={link}
+      >
         <div className="group h-full space-y-2 rounded-lg border border-slate-8 bg-slate-3 p-2 transition-colors duration-300 hover:bg-slate-4">
           {linkMeta.isLoading ? (
             <div className="animate-pulse space-y-2">
@@ -53,11 +70,13 @@ const SourceLink = ({ link, index }: LinkInfo) => {
               <div className="flex items-center gap-2 overflow-ellipsis">
                 <img
                   className="inline h-4 w-4"
-                  src={linkMeta.data.favicon || ""}
-                  alt="Logo"
+                  src={linkMeta.data.favicon ?? ""}
+                  alt={`${linkMeta.data.hostname} logo`}
                   onError={addImageFallback}
                 />
-                <p className="line-clamp-1 overflow-ellipsis">{linkMeta.data.hostname}</p>
+                <p className="line-clamp-1 overflow-ellipsis">
+                  {linkMeta.data.hostname}
+                </p>
                 <p className="rounded-full bg-slate-5 px-2 text-slate-12 transition-colors duration-300 group-hover:bg-sky-600 group-hover:text-white">
                   {index + 1}
                 </p>
@@ -66,7 +85,9 @@ const SourceLink = ({ link, index }: LinkInfo) => {
           ) : linkMeta.isError ? (
             <div className="flex gap-2">
               <p className="line-clamp-1">{link}</p>
-              <p className="rounded-full bg-slate-5 px-3 text-slate-12">{index + 1}</p>
+              <p className="rounded-full bg-slate-5 px-3 text-slate-12">
+                {index + 1}
+              </p>
             </div>
           ) : null}
         </div>
