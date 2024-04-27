@@ -1,24 +1,36 @@
-import { motion } from "framer-motion";
-import type { PropsWithChildren } from "react";
+import { motion, Variants } from "framer-motion";
+import type { PropsWithChildren, ReactNode } from "react";
 
-interface MotionProps extends PropsWithChildren {
+interface ExpandProps extends PropsWithChildren {
   className?: string;
   delay?: number;
   type?: "spring" | "tween";
 }
 
-const Expand = (props: MotionProps) => (
+const expandVariants: Variants = {
+  initial: { scaleX: 0.8, scaleY: 0 },
+  animate: { scaleX: 1, scaleY: 1 },
+};
+
+const expandTransitionDefaults = {
+  duration: 0.75,
+  type: "spring",
+  delay: 0,
+};
+
+const Expand = (props: ExpandProps) => (
   <motion.div
-    initial={{ scaleX: 0.8, scaleY: 0 }}
-    animate={{ scaleX: 1, scaleY: 1 }}
+    variants={expandVariants}
+    initial="initial"
+    animate="animate"
     transition={{
-      duration: 0.75,
-      type: props.type ?? "spring",
-      delay: props.delay ?? 0,
+      ...expandTransitionDefaults,
+      type: props.type ?? expandTransitionDefaults.type,
+      delay: props.delay ?? expandTransitionDefaults.delay,
     }}
-    {...props}
+    className={props.className}
   >
-    {props.children}
+    {props.children as ReactNode}
   </motion.div>
 );
 
