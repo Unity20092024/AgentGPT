@@ -11,27 +11,23 @@ from reworkd_platform.web.api.errors import MaxLoopsError, MultipleSummaryError
 
 
 class AgentCRUD(BaseCrud):
+    """CRUD operations for AgentRun and AgentTask models."""
+
     def __init__(self, session: AsyncSession, user: UserBase):
         super().__init__(session)
         self.user = user
 
-    async def create_run(self, goal: str) -> AgentRun:
-        return await AgentRun(
-            user_id=self.user.id,
-            goal=goal,
-        ).save(self.session)
+    def __repr__(self):
+        return f"<AgentCRUD user_id={self.user.id}>"
 
-    async def create_task(self, run_id: str, type_: Loop_Step) -> AgentTask:
-        await self.validate_task_count(run_id, type_)
-        return await AgentTask(
-            run_id=run_id,
-            type_=type_,
-        ).save(self.session)
+    async def get_run(self, run_id: str) -> AgentRun:
+        """Get a run by id."""
+        return await AgentRun.get(self.session, run_id)
 
-    async def validate_task_count(self, run_id: str, type_: str) -> None:
-        if not await AgentRun.get(self.session, run_id):
-            raise HTTPException(404, f"Run {run_id} not found")
-
+    async def get_task_count_by_run_and_type(
+        self, run_id: str, type_: str
+    ) -> int:
+        """Get the count of tasks by run and type."""
         query = select(func.count(AgentTask.id)).where(
             and_(
                 AgentTask.run_id == run_id,
@@ -39,8 +35,38 @@ class AgentCRUD(BaseCrud):
             )
         )
 
-        task_count = (await self.session.execute(query)).scalar_one()
+        return (await self.session.execute(query)).scalar_one()
+
+    async def create_run(self, goal: str) -> AgentRun:
+        """Create a new run."""
+        run = AgentRun(
+            user_id=self.user.id,
+            goal=goal,
+        )
+
+        return await run.save(self.session)
+
+    async def create_task(self, run_id: str, type_: Loop_Step) -> AgentTask:
+        """Create a new task."""
+        await self.validate_task_count(run_id, type_)
+
+        task = AgentTask(
+            run_id=run_id,
+            type_=type_,
+        )
+
+        return await task.save(self.session)
+
+    async def validate_task_count(
+        self, run_id: str, type_: str
+    ) -> None:
+        """Validate the task count for a given run and type."""
+        run = await self.get_run(run_id)
+        if not run:
+            raise HTTPException(404, f"Run {run_id} not found")
+
         max_ = settings.max_loops
+        task_count = await self.get_task_count_by_run_and_type(run_id, type_)
 
         if task_count >= max_:
             raise MaxLoopsError(
