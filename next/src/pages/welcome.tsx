@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import FadeIn from "../components/motions/FadeIn";
 import PrimaryButton from "../components/PrimaryButton";
 
-const welcome = () => {
+const Welcome = () => {
   const router = useRouter();
   const controls = useAnimation();
   const [buttonClicked, setButtonClicked] = useState(false);
@@ -15,32 +15,34 @@ const welcome = () => {
     controls.start({
       scale: 1,
       y: 0,
+      opacity: 1,
       transition: { type: "spring", stiffness: 80, damping: 15, mass: 1 },
     });
   }, [controls]);
 
   useEffect(() => {
     if (buttonClicked) {
-      controls.start({
-        opacity: 0,
-        transition: { duration: 0.75 },
-      });
+      const timer = setTimeout(() => {
+        controls.start({
+          opacity: 0,
+          transition: { duration: 0.75 },
+        });
+        router.push("/").catch(console.error);
+      }, 1000);
+
+      return () => clearTimeout(timer);
     }
-  }, [buttonClicked, controls]);
+  }, [buttonClicked, controls, router]);
 
   const handleButtonClick = () => {
     setButtonClicked(true);
-    setInterval(() => {
-      // Wait 1 second and redirect
-      router.push("/").catch(console.error);
-    }, 1000);
   };
 
   return (
     <div className="flex h-full min-h-screen w-full items-center justify-center overflow-hidden bg-black">
       <motion.div
         className="max-h-4xl flex h-full w-full max-w-4xl flex-col items-center justify-center text-center font-sans"
-        initial={{ scale: 5, y: 1100, opacity: 1 }}
+        initial={{ scale: 5, y: 1100, opacity: 0 }}
         animate={controls}
       >
         <motion.div>
@@ -59,7 +61,7 @@ const welcome = () => {
         </FadeIn>
         <FadeIn duration={2.85} delay={0.6} initialY={-40}>
           <p className="mb-8 max-w-lg text-center font-light text-neutral-500">
-            Optimize web scraping with AI Agents that auto-generates, repairs scripts, and ensures uninterrupted data retrieval. Scale your data extraction effortlessly.
+            Optimize web scraping with AI Agents that auto-generate, repair scripts, and ensure uninterrupted data retrieval. Scale your data extraction effortlessly.
           </p>
         </FadeIn>
         <FadeIn duration={2.7} delay={0.75} initialY={-40}>
@@ -72,4 +74,4 @@ const welcome = () => {
   );
 };
 
-export default welcome;
+export default Welcome;
