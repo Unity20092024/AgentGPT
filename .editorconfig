@@ -1,9 +1,19 @@
-root = true
+# This is a YAML configuration file
 
-[*]
-indent_style = space
-indent_size = 2
-end_of_line = lf
-charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
+# Set the root value to true
+root: true
+
+# Configuration for code formatting
+code_format:
+  # Indent style can be either space or tab
+  indent_style: space
+  # Indent size specifies the number of spaces or tabs
+  indent_size: 2
+  # End of line character can be either lf or cr
+  end_of_line: lf
+  # Charset to be used
+  charset: utf-8
+  # Trim trailing whitespace
+  trim_trailing_whitespace: true
+  # Insert a final newline
+  insert_final_newline: true
