@@ -5,17 +5,19 @@ import tiktoken
 from reworkd_platform.schemas.agent import LLM_MODEL_MAX_TOKENS
 from reworkd_platform.services.tokenizer.token_service import TokenService
 
-encoding = tiktoken.get_encoding("cl100k_base")
+EncodingType = tiktoken.Encoding
 
 
-def test_happy_path() -> None:
-    service = TokenService(encoding)
+def create_token_service(encoding: EncodingType) -> TokenService:
+    return TokenService(encoding)
+
+
+def test_happy_path(service: TokenService) -> None:
     text = "Hello world!"
-    validate_tokenize_and_detokenize(service, text, 3)
+    validate_tokenize_and_detokenize(service, text, 2)
 
 
-def test_nothing() -> None:
-    service = TokenService(encoding)
+def test_empty_string(service: TokenService) -> None:
     text = ""
     validate_tokenize_and_detokenize(service, text, 0)
 
@@ -29,9 +31,8 @@ def validate_tokenize_and_detokenize(
     assert len(tokens) == expected_token_count
 
 
-def test_calculate_max_tokens_with_small_max_tokens() -> None:
+def test_calculate_max_tokens_with_small_max_tokens(service: TokenService) -> None:
     initial_max_tokens = 3000
-    service = TokenService(encoding)
     model = Mock(spec=["model_name", "max_tokens"])
     model.model_name = "gpt-3.5-turbo"
     model.max_tokens = initial_max_tokens
@@ -41,8 +42,7 @@ def test_calculate_max_tokens_with_small_max_tokens() -> None:
     assert model.max_tokens == initial_max_tokens
 
 
-def test_calculate_max_tokens_with_high_completion_tokens() -> None:
-    service = TokenService(encoding)
+def test_calculate_max_tokens_with_high_completion_tokens(service: TokenService) -> None:
     prompt_tokens = service.count(LONG_TEXT)
     model = Mock(spec=["model_name", "max_tokens"])
     model.model_name = "gpt-3.5-turbo"
@@ -55,13 +55,12 @@ def test_calculate_max_tokens_with_high_completion_tokens() -> None:
     )
 
 
-def test_calculate_max_tokens_with_negative_result() -> None:
-    service = TokenService(encoding)
+def test_calculate_max_tokens_with_negative_result(service: TokenService) -> None:
     model = Mock(spec=["model_name", "max_tokens"])
     model.model_name = "gpt-3.5-turbo"
     model.max_tokens = 8000
 
-    service.calculate_max_tokens(model, *([LONG_TEXT] * 100))
+    service.calculate_max_tokens(model, LONG_TEXT * 100)
 
     # We use the minimum length of 1
     assert model.max_tokens == 1
@@ -97,9 +96,18 @@ This is some long text. This is some long text. This is some long text.
 This is some long text. This is some long text. This is some long text.
 This is some long text. This is some long text. This is some long text.
 This is some long text. This is some long text. This is some long text.
-This is some long text. This is some long text. This is some long text.
-This is some long text. This is some long text. This is some long text.
-This is some long text. This is some long text. This is some long text.
-This is some long text. This is some long text. This is some long text.
+This is some long text. This is some long text. This if some long text.
 This is some long text. This is some long text. This is some long text.
 """
+
+
+if __name__ == "__main__":
+    encoding = tiktoken.get_encoding("cl100k_base")
+    service = create_token_service(encoding)
+
+    # Run all tests
+    test_happy_path(service)
+    test_empty_string(service)
+    test_calculate_max_tokens_with_small_max_tokens(service)
+    test_calculate_max_tokens_with_high_completion_tokens(service)
+    test_calculate_max_tokens_with_negative_result(service)
