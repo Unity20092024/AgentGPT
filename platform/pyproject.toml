@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "reworkd_platform"
+name = "reworkd-platform"
 version = "0.1.0"
 description = ""
 authors = [
@@ -98,3 +98,31 @@ env = [
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pytest-env",
+    "pytest-mock",
+    "autopep8",
+    "flake8",
+    "isort",
+    "wemake-python-styleguide",
+    "black",
+    "autoflake",
+    "mypy",
+    "dotmap",
+    "types-requests",
+    "types-pytz",
+]
+
+doc = [
+    "sphinx",
+    "furo",
+]
+
+dev = [
+    "pre-commit",
+]
