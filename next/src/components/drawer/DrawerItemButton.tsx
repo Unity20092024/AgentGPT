@@ -1,14 +1,15 @@
 import clsx from "clsx";
-import React from "react";
+import React, { useState } from "react";
 
 interface DrawerItemProps {
   text: string;
   className?: string;
   onClick?: () => Promise<void> | void;
+  isLoading?: boolean;
 }
 
 export const DrawerItemButton = (props: DrawerItemProps) => {
-  const { text, onClick } = props;
+  const { text, onClick, isLoading, ...buttonProps } = props;
 
   return (
     <button
@@ -18,12 +19,18 @@ export const DrawerItemButton = (props: DrawerItemProps) => {
         props.className
       )}
       onClick={onClick}
+      disabled={isLoading}
+      {...buttonProps}
     >
-      <span className="line-clamp-1 text-left text-sm font-medium">{text}</span>
+      {isLoading ? (
+        <div className="w-50 mx-1.5 h-7 animate-pulse rounded-md bg-slate-6" data-testid="loader" />
+      ) : (
+        <span className="line-clamp-1 text-left text-sm font-medium">{text}</span>
+      )}
     </button>
   );
 };
 
-export const DrawerItemButtonLoader = () => {
-  return <div className="w-50 mx-1.5 h-7 animate-pulse rounded-md bg-slate-6"></div>;
+DrawerItemButton.defaultProps = {
+  isLoading: false,
 };
