@@ -1,65 +1,60 @@
-from typing import List, Optional
+import asyncio
+import logging
+import re
+from typing import Any, Callable, Dict, List, Optional, Type
 
-from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
-from lanarky.responses import StreamingResponse
+import openai
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from langchain import LLMChain
 from langchain.callbacks.base import AsyncCallbackHandler
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langchain.schema import HumanMessage
-from loguru import logger
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
+from pydantic.json import pydantic_encoder
+from ratelimiter import RateLimiter
+from typing_extensions import Literal
 
-from reworkd_platform.db.crud.oauth import OAuthCrud
-from reworkd_platform.schemas.agent import ModelSettings
-from reworkd_platform.schemas.user import UserBase
-from reworkd_platform.services.tokenizer.token_service import TokenService
-from reworkd_platform.web.api.agent.agent_service.agent_service import AgentService
-from reworkd_platform.web.api.agent.analysis import Analysis, AnalysisArguments
-from reworkd_platform.web.api.agent.helpers import (
-    call_model_with_handling,
-    openai_error_handler,
-    parse_with_handling,
-)
-from reworkd_platform.web.api.agent.model_factory import WrappedChatOpenAI
-from reworkd_platform.web.api.agent.prompts import (
-    analyze_task_prompt,
-    chat_prompt,
-    create_tasks_prompt,
-    start_goal_prompt,
-)
+import reworkd_platform.db.crud.oauth as oauth_crud
+import reworkd_platform.schemas.agent as agent_schemas
+import reworkd_platform.schemas.user as user_schemas
+import reworkd_platform.services.tokenizer.token_service as token_service
+import reworkd_platform.web.api.agent.analysis as analysis
+import reworkd_platform.web.api.agent.helpers as agent_helpers
+import reworkd_platform.web.api.agent.model_factory as model_factory
+import reworkd_platform.web.api.agent.prompts as prompts
+import reworkd_platform.web.api.agent.tools.open_ai_function as open_ai_function
+import reworkd_platform.web.api.agent.tools.tools as tools
+import reworkd_platform.web.api.agent.tools.utils as tools_utils
 from reworkd_platform.web.api.agent.task_output_parser import TaskOutputParser
-from reworkd_platform.web.api.agent.tools.open_ai_function import get_tool_function
-from reworkd_platform.web.api.agent.tools.tools import (
-    get_default_tool,
-    get_tool_from_name,
-    get_tool_name,
-    get_user_tools,
-)
-from reworkd_platform.web.api.agent.tools.utils import summarize
 from reworkd_platform.web.api.errors import OpenAIError
 
+logger = logging.getLogger(__name__)
+re.compile("")  # This line is a workaround for a Flake8 issue.
 
 class OpenAIAgentService(AgentService):
     def __init__(
         self,
-        model: WrappedChatOpenAI,
-        settings: ModelSettings,
-        token_service: TokenService,
+        model: model_factory.WrappedChatOpenAI,
+        settings: agent_schemas.ModelSettings,
+        token_service: token_service.TokenService,
         callbacks: Optional[List[AsyncCallbackHandler]],
-        user: UserBase,
-        oauth_crud: OAuthCrud,
+        user: user_schemas.UserBase,
+        oauth_crud: oauth_crud.OAuthCrud,
     ):
         self.model = model
         self.settings = settings
         self.token_service = token_service
-        self.callbacks = callbacks
+        self.callbacks = callbacks or []
         self.user = user
         self.oauth_crud = oauth_crud
+        self._rate_limiter = RateLimiter(max_calls=10, period=1)
 
-    async def start_goal_agent(self, *, goal: str) -> List[str]:
+    async def start_goal(self, *, goal: str) -> List[str]:
         prompt = ChatPromptTemplate.from_messages(
-            [SystemMessagePromptTemplate(prompt=start_goal_prompt)]
+            [SystemMessagePromptTemplate(prompt=prompts.start_goal_prompt)]
         )
 
         self.token_service.calculate_max_tokens(
@@ -70,10 +65,10 @@ class OpenAIAgentService(AgentService):
             ).to_string(),
         )
 
-        completion = await call_model_with_handling(
+        completion = await agent_helpers.call_model_with_handling(
             self.model,
             ChatPromptTemplate.from_messages(
-                [SystemMessagePromptTemplate(prompt=start_goal_prompt)]
+                [SystemMessagePromptTemplate(prompt=prompts.start_goal_prompt)]
             ),
             {"goal": goal, "language": self.settings.language},
             settings=self.settings,
@@ -81,16 +76,16 @@ class OpenAIAgentService(AgentService):
         )
 
         task_output_parser = TaskOutputParser(completed_tasks=[])
-        tasks = parse_with_handling(task_output_parser, completion)
+        tasks = task_output_parser.parse(completion)
 
         return tasks
 
-    async def analyze_task_agent(
+    async def analyze_task(
         self, *, goal: str, task: str, tool_names: List[str]
-    ) -> Analysis:
-        user_tools = await get_user_tools(tool_names, self.user, self.oauth_crud)
-        functions = list(map(get_tool_function, user_tools))
-        prompt = analyze_task_prompt.format_prompt(
+    ) -> analysis.Analysis:
+        user_tools = await tools.get_user_tools(tool_names, self.user, self.oauth_crud)
+        functions = [open_ai_function.get_tool_function(tool) for tool in user_tools]
+        prompt = prompts.analyze_task_prompt.format_prompt(
             goal=goal,
             task=task,
             language=self.settings.language,
@@ -102,8 +97,8 @@ class OpenAIAgentService(AgentService):
             str(functions),
         )
 
-        message = await openai_error_handler(
-            func=self.model.apredict_messages,
+        message = await agent_helpers.openai_error_handler(
+            func=self.model.predict_messages,
             messages=prompt.to_messages(),
             functions=functions,
             settings=self.settings,
@@ -114,27 +109,23 @@ class OpenAIAgentService(AgentService):
         completion = function_call.get("arguments", "")
 
         try:
-            pydantic_parser = PydanticOutputParser(pydantic_object=AnalysisArguments)
-            analysis_arguments = parse_with_handling(pydantic_parser, completion)
-            return Analysis(
-                action=function_call.get("name", get_tool_name(get_default_tool())),
+            pydantic_parser = PydanticOutputParser(pydantic_object=analysis.AnalysisArguments)
+            analysis_arguments = pydantic_parser.parse(completion)
+            return analysis.Analysis(
+                action=function_call.get("name", tools.get_tool_name(tools.get_default_tool())),
                 **analysis_arguments.dict(),
             )
         except (OpenAIError, ValidationError):
-            return Analysis.get_default_analysis(task)
+            return analysis.Analysis.get_default_analysis(task)
 
-    async def execute_task_agent(
+    async def execute_task(
         self,
         *,
         goal: str,
         task: str,
-        analysis: Analysis,
+        analysis: analysis.Analysis,
     ) -> StreamingResponse:
-        # TODO: More mature way of calculating max_tokens
-        if self.model.max_tokens > 3000:
-            self.model.max_tokens = max(self.model.max_tokens - 1000, 3000)
-
-        tool_class = get_tool_from_name(analysis.action)
+        tool_class = tools.get_tool_from_name(analysis.action)
         return await tool_class(self.model, self.settings.language).call(
             goal,
             task,
@@ -143,7 +134,7 @@ class OpenAIAgentService(AgentService):
             self.oauth_crud,
         )
 
-    async def create_tasks_agent(
+    async def create_tasks(
         self,
         *,
         goal: str,
@@ -153,7 +144,7 @@ class OpenAIAgentService(AgentService):
         completed_tasks: Optional[List[str]] = None,
     ) -> List[str]:
         prompt = ChatPromptTemplate.from_messages(
-            [SystemMessagePromptTemplate(prompt=create_tasks_prompt)]
+            [SystemMessagePromptTemplate(prompt=prompts.create_tasks_prompt)]
         )
 
         args = {
@@ -168,19 +159,19 @@ class OpenAIAgentService(AgentService):
             self.model, prompt.format_prompt(**args).to_string()
         )
 
-        completion = await call_model_with_handling(
+        completion = await agent_helpers.call_model_with_handling(
             self.model, prompt, args, settings=self.settings, callbacks=self.callbacks
         )
 
         previous_tasks = (completed_tasks or []) + tasks
         return [completion] if completion not in previous_tasks else []
 
-    async def summarize_task_agent(
+    async def summarize_task(
         self,
         *,
         goal: str,
         results: List[str],
-    ) -> FastAPIStreamingResponse:
+    ) -> StreamingResponse:
         self.model.model_name = "gpt-3.5-turbo-16k"
         self.model.max_tokens = 8000  # Total tokens = prompt tokens + completion tokens
 
@@ -189,7 +180,7 @@ class OpenAIAgentService(AgentService):
         text = self.token_service.detokenize(text_tokens[0:snippet_max_tokens])
         logger.info(f"Summarizing text: {text}")
 
-        return summarize(
+        return tools_utils.summarize(
             model=self.model,
             language=self.settings.language,
             goal=goal,
@@ -201,11 +192,11 @@ class OpenAIAgentService(AgentService):
         *,
         message: str,
         results: List[str],
-    ) -> FastAPIStreamingResponse:
+    ) -> StreamingResponse:
         self.model.model_name = "gpt-3.5-turbo-16k"
         prompt = ChatPromptTemplate.from_messages(
             [
-                SystemMessagePromptTemplate(prompt=chat_prompt),
+                SystemMessagePromptTemplate(prompt=prompts.chat_prompt),
                 *[HumanMessage(content=result) for result in results],
                 HumanMessage(content=message),
             ]
@@ -225,3 +216,11 @@ class OpenAIAgentService(AgentService):
             {"language": self.settings.language},
             media_type="text/event-stream",
         )
+
+    @property
+    def max_tokens(self) -> int:
+        return self.model.max_tokens
+
+    @max_tokens.setter
+    def max_tokens(self, value: int) -> None:
+        self.model.max_tokens = value
