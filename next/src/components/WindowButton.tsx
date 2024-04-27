@@ -1,26 +1,41 @@
 import clsx from "clsx";
-import React from "react";
+import React, { ReactNode } from "react";
 
 import Ping from "./Ping";
 
 type WindowButtonProps = {
   ping?: boolean; // Toggles the ping animation
   onClick?: () => void;
-  icon: React.ReactNode;
+  icon: ReactNode;
   text: string;
   border?: boolean;
+  type?: "button" | "submit" | "reset";
+  tabIndex?: number;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 };
 
-const WindowButton = ({ ping, onClick, icon, text, border }: WindowButtonProps) => {
+const WindowButton = ({
+  ping,
+  onClick,
+  icon,
+  text,
+  border,
+  type = "button",
+  tabIndex = 0,
+  onKeyDown,
+}: WindowButtonProps) => {
   return (
     <div
       className={clsx(
         "relative flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-slate-1 p-2 font-mono text-sm font-bold text-slate-12 transition-all hover:bg-slate-3",
         !border && "rounded-none border-none"
       )}
+      role="button"
       onClick={onClick}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
     >
-      {ping ? <Ping color="blue" /> : <></>}
+      {ping ? <Ping color="blue" /> : null}
       {icon}
       <p className="text-gray/50 font-mono">{text}</p>
     </div>
