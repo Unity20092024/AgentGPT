@@ -1,5 +1,6 @@
+import React from "react";
+import PropTypes from "prop-types";
 import { Ring } from "@uiball/loaders";
-import type { FC } from "react";
 
 interface LoaderProps {
   className?: string;
@@ -9,7 +10,7 @@ interface LoaderProps {
   color?: string;
 }
 
-const Loader: FC<LoaderProps> = ({
+const Loader: React.FC<LoaderProps> = ({
   className,
   size = 16,
   speed = 2,
@@ -21,6 +22,14 @@ const Loader: FC<LoaderProps> = ({
       <Ring size={size} speed={speed} color={color} lineWeight={lineWeight} />
     </div>
   );
+};
+
+Loader.propTypes = {
+  className: PropTypes.string,
+  size: PropTypes.number,
+  speed: PropTypes.number,
+  lineWeight: PropTypes.number,
+  color: PropTypes.string,
 };
 
 export default Loader;
