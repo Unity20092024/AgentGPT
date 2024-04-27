@@ -1,13 +1,10 @@
 import clsx from "clsx";
-import * as htmlToImage from "html-to-image";
+import htmlToImage from "html-to-image";
 import { useTranslation } from "next-i18next";
-import type { PropsWithChildren, ReactNode } from "react";
-import React from "react";
+import { PropsWithChildren, ReactNode, useRef } from "react";
 import { CgExport } from "react-icons/cg";
 import { FaImage } from "react-icons/fa";
 import { FiClipboard } from "react-icons/fi";
-
-import type { Message } from "../../types/message";
 import Menu from "../Menu";
 import Expand from "../motions/expand";
 import PopIn from "../motions/popin";
@@ -16,68 +13,73 @@ import WindowButton from "../WindowButton";
 
 export const messageListId = "chat-window-message-list";
 
+export interface Message {
+  // Add any necessary message properties here
+}
+
 export interface HeaderProps {
   title?: string | ReactNode;
   messages: Message[];
 }
 
-export const MacWindowHeader = (props: HeaderProps) => {
-  const [t] = useTranslation();
+const saveElementAsImage = async (elementId: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return;
+  }
 
-  const saveElementAsImage = (elementId: string) => {
-    const element = document.getElementById(elementId);
-    if (!element) {
-      return;
+  try {
+    const dataUrl = await htmlToImage.toJpeg(element, {
+      height: element.scrollHeight,
+      style: {
+        overflowY: "visible",
+        maxHeight: "none",
+        border: "none",
+      },
+    });
+
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = "agent-gpt-output.png";
+    link.click();
+  } catch (error) {
+    alert(
+      "Error saving image! Note this doesn't work if the AI generated an image"
+    );
+  }
+};
+
+const copyElementText = (elementId: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return;
+  }
+
+  const text = element.innerText;
+
+  if (navigator.clipboard) {
+    void navigator.clipboard.writeText(text);
+  } else {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      document.execCommand("copy");
+      console.log("Text copied to clipboard");
+    } catch (err) {
+      console.error("Unable to copy text to clipboard", err);
     }
 
-    htmlToImage
-      .toJpeg(element, {
-        height: element.scrollHeight,
-        style: {
-          overflowY: "visible",
-          maxHeight: "none",
-          border: "none",
-        },
-      })
-      .then((dataUrl) => {
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = "agent-gpt-output.png";
-        link.click();
-      })
-      .catch(() =>
-        alert("Error saving image! Note this doesn't work if the AI generated an image")
-      );
-  };
+    document.body.removeChild(textArea);
+  }
+};
 
-  const copyElementText = (elementId: string) => {
-    const element = document.getElementById(elementId);
-    if (!element) {
-      return;
-    }
-
-    const text = element.innerText;
-
-    if (navigator.clipboard) {
-      void navigator.clipboard.writeText(text);
-    } else {
-      // Fallback to a different method for unsupported browsers
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-
-      try {
-        document.execCommand("copy");
-        console.log("Text copied to clipboard");
-      } catch (err) {
-        console.error("Unable to copy text to clipboard", err);
-      }
-
-      document.body.removeChild(textArea);
-    }
-  };
+const MacWindowHeader = (props: HeaderProps) => {
+  const { t } = useTranslation();
+  const messageListRef = useRef<HTMLDivElement>(null);
 
   const exportOptions = [
     <WindowButton
@@ -96,7 +98,10 @@ export const MacWindowHeader = (props: HeaderProps) => {
   ];
 
   return (
-    <div className="flex items-center gap-1 overflow-visible rounded-t-3xl p-1.5 px-1">
+    <div
+      className="flex items-center gap-1 overflow-visible rounded-t-3xl p-1.5 px-1"
+      ref={messageListRef}
+    >
       <PopIn delay={0.4}>
         <div className="h-3 w-3 rounded-full bg-red-500" />
       </PopIn>
@@ -121,7 +126,7 @@ interface MacWindowInternalProps extends PropsWithChildren {
   className?: string;
 }
 
-export const MacWindowInternal = (props: MacWindowInternalProps) => {
+const MacWindowInternal = (props: MacWindowInternalProps) => {
   return (
     <div
       className={clsx(
@@ -147,3 +152,5 @@ export const MacWindowInternal = (props: MacWindowInternalProps) => {
     </div>
   );
 };
+
+export { MacWindowHeader, MacWindowInternal };
