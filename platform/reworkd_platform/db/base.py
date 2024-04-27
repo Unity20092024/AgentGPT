@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
     id: Mapped[str] = mapped_column(
         String,
         primary_key=True,
-        default=lambda _: str(uuid.uuid4()),
+        default=lambda: str(uuid.uuid4()),
         unique=True,
         nullable=False,
     )
@@ -30,9 +30,9 @@ class Base(DeclarativeBase):
 
     @classmethod
     async def get_or_404(cls: Type[T], session: AsyncSession, id_: str) -> T:
-        if model := await cls.get(session, id_):
+        model = await cls.get(session, id_)
+        if model:
             return model
-
         raise not_found(detail=f"{cls.__name__}[{id_}] not found")
 
     async def save(self: T, session: AsyncSession) -> T:
@@ -66,3 +66,11 @@ class TrackedModel(Base):
 class UserMixin:
     user_id = mapped_column(String, name="user_id", nullable=False)
     organization_id = mapped_column(String, name="organization_id", nullable=True)
+
+    @classmethod
+    async def get_or_404(cls: Type["UserMixin"], session: AsyncSession, user_id: str) -> "UserMixin":
+        user = await cls.get(session, user_id)
+        if user:
+            return user
+        raise not_found(detail=f"User[{user_id}] not found")
+
