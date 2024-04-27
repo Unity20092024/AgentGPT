@@ -4,20 +4,20 @@ import type { ReactNode } from "react";
 import { Fragment } from "react";
 import { FaBars } from "react-icons/fa";
 
-export type DisplayProps = {
-  show: boolean;
-  setShow: (boolean: boolean) => void;
+export type SidebarDisplayProps = {
+  isOpen: boolean;
+  toggle: () => void;
+  side: "left" | "right";
 };
 
-export type SidebarProps = DisplayProps & {
+export type SidebarProps = SidebarDisplayProps & {
   children: ReactNode;
-  side: "left" | "right";
   className?: string;
 };
 
-const Sidebar = ({ show, children, side, className }: SidebarProps) => {
+const Sidebar = ({ isOpen, toggle, children, side, className }: SidebarProps) => {
   return (
-    <SidebarTransition show={show} side={side}>
+    <SidebarTransition isOpen={isOpen} side={side}>
       <nav
         className={clsx(
           "flex flex-1 flex-col overflow-x-hidden bg-slate-3 p-4 ring-1 ring-white/10",
@@ -31,15 +31,15 @@ const Sidebar = ({ show, children, side, className }: SidebarProps) => {
 };
 
 type SidebarTransitionProps = {
+  isOpen: boolean;
   side: "left" | "right";
   children: ReactNode;
-  show: boolean;
   className?: string;
 };
 
-export const SidebarTransition = ({ children, show, side, className }: SidebarTransitionProps) => {
+export const SidebarTransition = ({ isOpen, children, side, className }: SidebarTransitionProps) => {
   return (
-    <Transition.Root show={show} as={Fragment}>
+    <Transition.Root show={isOpen} as={Fragment}>
       <div className="relative z-30">
         <Transition.Child
           as={Fragment}
@@ -75,20 +75,21 @@ export const SidebarTransition = ({ children, show, side, className }: SidebarTr
 };
 
 export const SidebarControlButton = ({
-  show,
-  setShow,
+  isOpen,
+  toggle,
   side,
-}: DisplayProps & { side: "left" | "right" }) => {
+}: SidebarDisplayProps) => {
   return (
     <button
       className={clsx(
         "fixed z-20 m-1 rounded-md bg-slate-1 shadow-depth-1 transition-all sm:m-2",
         side === "right" && "right-0"
       )}
-      onClick={() => setShow(!show)}
+      onClick={toggle}
     >
       <FaBars size="12" className="z-20 m-2 text-slate-11" />
     </button>
   );
 };
+
 export default Sidebar;
