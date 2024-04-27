@@ -3,7 +3,7 @@ import clsx from "clsx";
 import type { GetStaticProps } from "next";
 import { useTranslation } from "next-i18next";
 import { serverSideTranslations } from "next-i18next/serverSideTranslations";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FaCheckCircle,
   FaCoins,
@@ -18,10 +18,9 @@ import {
 import nextI18NextConfig from "../../next-i18next.config.js";
 import FadeIn from "../components/motions/FadeIn";
 import { useAuth } from "../hooks/useAuth";
-import type { LLMModel } from "../hooks/useModels";
 import { useModels } from "../hooks/useModels";
 import { useSettings } from "../hooks/useSettings";
-import DashboardLayout from "../layout/dashboard";
+import type { LLMModel } from "../hooks/useModels";
 import type { GPTModelNames } from "../types";
 import Button from "../ui/button";
 import Combo from "../ui/combox";
@@ -31,8 +30,15 @@ import { languages } from "../utils/languages";
 
 const SettingsPage = () => {
   const [t] = useTranslation("settings");
-  const { settings, updateSettings, updateLangauge } = useSettings();
-  const { session } = useAuth({ protectedRoute: true });
+  const { settings, updateSettings, updateLangauge } = useSettings<{
+    language: Language;
+    customApiKey: string;
+    customModelName: GPTModelNames;
+    customTemperature: number;
+    customMaxLoops: number;
+    maxTokens: number;
+  }>();
+  const { session, isLoading, isError, error } = useAuth({ protectedRoute: true });
   const { models, getModel } = useModels();
 
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean | undefined>(undefined);
@@ -50,6 +56,12 @@ const SettingsPage = () => {
       setIsApiKeyValid(false);
     }
   };
+
+  useEffect(() => {
+    if (settings.customApiKey) {
+      validateApiKey();
+    }
+  }, [settings.customApiKey]);
 
   const disableAdvancedSettings = !session?.user;
   const model = getModel(settings.customModelName) || {
@@ -89,6 +101,7 @@ const SettingsPage = () => {
           <FadeIn initialY={45} delay={0.1} className="mt-4 px-10">
             <div className="flex flex-col gap-3">
               <Combo<Language>
+                key="language-combo"
                 label="Language"
                 value={settings.language}
                 valueMapper={(e) => e.name}
@@ -99,6 +112,7 @@ const SettingsPage = () => {
                 icon={<FaGlobe />}
               />
               <Input
+                key="api-key-input"
                 label="API Key"
                 name="api-key"
                 placeholder="sk..."
@@ -120,6 +134,7 @@ const SettingsPage = () => {
                 className="flex-grow-1 mr-2"
                 right={
                   <Button
+                    key="api-key-test-button"
                     onClick={validateApiKey}
                     className={clsx(
                       "transition-400 h-11 w-16 rounded text-sm text-white duration-200",
@@ -127,6 +142,7 @@ const SettingsPage = () => {
                       isApiKeyValid === true && "bg-green-500 hover:bg-green-700",
                       isApiKeyValid === false && "bg-red-500 hover:bg-red-700"
                     )}
+                    aria-label="Test API Key"
                   >
                     {isApiKeyValid === undefined && "Test"}
                     {isApiKeyValid === true && <FaCheckCircle />}
@@ -141,6 +157,7 @@ const SettingsPage = () => {
                 <h1 className="pb-4 text-xl font-bold text-slate-12">Advanced Settings</h1>
                 <div className="flex flex-col gap-4">
                   <Combo<LLMModel>
+                    key="model-combo"
                     label="Model"
                     value={model}
                     valueMapper={(e) => e.name}
@@ -149,6 +166,7 @@ const SettingsPage = () => {
                     icon={<FaRobot />}
                   />
                   <Input
+                    key="temperature-input"
                     label={`${t("TEMPERATURE")}`}
                     value={settings.customTemperature}
                     name="temperature"
@@ -166,6 +184,7 @@ const SettingsPage = () => {
                     disabled={disableAdvancedSettings}
                   />
                   <Input
+                    key="loop-input"
                     label={`${t("LOOP")}`}
                     value={settings.customMaxLoops}
                     name="loop"
@@ -181,6 +200,7 @@ const SettingsPage = () => {
                     disabled={disableAdvancedSettings}
                   />
                   <Input
+                    key="tokens-input"
                     label={`${t("TOKENS")}`}
                     value={settings.maxTokens}
                     name="tokens"
