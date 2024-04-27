@@ -1,10 +1,12 @@
-export const get_avatar = (user?: {
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-}) =>
-  user?.image ||
-  "https://avatar.vercel.sh/" +
-    (user?.email || "") +
-    ".svg?text=" +
-    (user?.name?.substr(0, 2).toUpperCase() || "");
+export const getAvatar = (user) => {
+  if (!user) return null;
+
+  const { name, email, image } = user;
+
+  if (image) return image;
+
+  const emailPart = email ? email : '';
+  const namePart = name ? name.substr(0, 2).toUpperCase() : '';
+
+  return `https://avatar.vercel.sh/${emailPart}.svg?text=${namePart}`;
+};
