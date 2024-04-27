@@ -1,18 +1,25 @@
 import clsx from "clsx";
 import React from "react";
 
-interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   name: string;
   label?: string;
-  attributes?: { [key: string]: string | number | string[] };
-  helpText?: string | React.ReactNode;
+  className?: string;
+  attributes?: React.HTMLAttributes<HTMLInputElement>;
+  helpText?: React.ReactNode;
   icon?: React.ReactNode;
   disabled?: boolean;
   right?: React.ReactNode;
   handleFocusChange?: (focused: boolean) => void;
+  required?: boolean;
+  min?: string | number;
+  max?: string | number;
+  step?: string | number;
+  autoComplete?: string;
+  onKeyDown?: React.KeyboardEvent<HTMLInputElement>;
 }
 
-const Input = (props: Props) => {
+const Input: React.FC<InputProps> = (props) => {
   return (
     <div>
       {props.label && (
@@ -22,13 +29,17 @@ const Input = (props: Props) => {
         >
           {props.icon}
           <span>{props.label}</span>
-
-          {props.type == "range" && (
+          {props.type === "range" && (
             <span className="text-xs font-medium text-slate-12 lg:text-sm">({props.value})</span>
           )}
         </label>
       )}
-      <div className="relative flex flex-col gap-1 rounded-md shadow-sm">
+      <div
+        className={clsx(
+          "relative flex flex-col gap-1 rounded-md shadow-sm",
+          props.className
+        )}
+      >
         {props.helpText && (
           <p
             className="text-xs font-light text-slate-11 lg:text-sm"
@@ -51,8 +62,14 @@ const Input = (props: Props) => {
             disabled={props.disabled}
             onFocus={() => props.handleFocusChange && props.handleFocusChange(true)}
             onBlur={() => props.handleFocusChange && props.handleFocusChange(false)}
+            required={props.required}
+            min={props.min}
+            max={props.max}
+            step={props.step}
+            autoComplete={props.autoComplete}
             {...(props.helpText ? { "aria-describedby": `${props.name}-description` } : {})}
             {...props.attributes}
+            {...props.onKeyDown && { onKeyDown: props.onKeyDown }}
           />
           {props.right}
         </div>
