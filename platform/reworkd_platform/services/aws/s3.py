@@ -1,8 +1,9 @@
+import asyncio
 import io
 import os
 from typing import Dict, List, Optional
 
-from aiohttp import ClientError
+import aiohttp
 from boto3 import client as boto3_client
 from loguru import logger
 from pydantic import BaseModel
@@ -10,32 +11,36 @@ from pydantic import BaseModel
 REGION = "us-east-1"
 
 
-# noinspection SpellCheckingInspection
 class PresignedPost(BaseModel):
     url: str
     fields: Dict[str, str]
 
 
 class SimpleStorageService:
-    # TODO: would be great if with could make this async
-
     def __init__(self, bucket: Optional[str]) -> None:
         if not bucket:
             raise ValueError("Bucket name must be provided")
 
+        self.bucket = bucket
         self._client = boto3_client("s3", region_name=REGION)
-        self._bucket = bucket
 
-    def create_presigned_upload_url(
+    async def acreate_presigned_upload_url(
         self,
         object_name: str,
     ) -> PresignedPost:
-        return PresignedPost(
-            **self._client.generate_presigned_post(
-                Bucket=self._bucket,
-                Key=object_name,
-            )
-        )
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"https://{self.bucket}.s3.{REGION}.amazonaws.com",
+                data={
+                    "acl": "public-read",
+                    "ContentType": "",
+                    "key": object_name,
+                },
+            ) as resp:
+                if resp.status != 200:
+                    raise Exception(f"Failed to create presigned URL: {resp.status}")
+                data = await resp.json()
+                return PresignedPost(url=data["url"], fields=data["fields"])
 
     def create_presigned_download_url(self, object_name: str) -> str:
         return self._client.generate_presigned_url(
@@ -77,9 +82,17 @@ class SimpleStorageService:
 
         return local_files
 
-    def delete_folder(self, prefix: str) -> None:
+    async def adelete_folder(self, prefix: str) -> None:
+        async def delete_keys(keys: List[str]) -> None:
+            if not keys:
+                return
+            await self._client.delete_objects(
+                Bucket=self._bucket,
+                Delete={"Objects": [{"Key": key} for key in keys]},
+            )
+
         keys = self.list_keys(prefix)
-        self._client.delete_objects(
-            Bucket=self._bucket,
-            Delete={"Objects": [{"Key": key} for key in keys]},
-        )
+        for i in range(0, len(keys), 1000):
+            await delete_keys(keys[i:i + 1000])
+
+
